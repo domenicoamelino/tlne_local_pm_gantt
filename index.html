@@ -68,6 +68,9 @@ body.linking .gbar{cursor:crosshair!important}
 .weekcell span{display:block;overflow:hidden;text-overflow:ellipsis}
 .weekcell small{margin-top:4px}
 @media(max-width:750px){.zoom-label{display:none}.toolrow{gap:5px!important}}
+#scroller{overflow-x:auto;overflow-y:auto;overscroll-behavior-x:contain}
+.gbar.completed .bartext{padding-right:24px}
+.gbar .complete-check{position:absolute;top:2px;right:4px;z-index:4;color:#16a765;font-size:15px;line-height:1;font-weight:900;text-shadow:0 1px 2px #fff9;pointer-events:none}
 </style><style id="tlne-connectors-v4">
 .dependency-overlay .dependency-grip{pointer-events:all;cursor:move;fill:#07100b;stroke:#a6ffcb;stroke-width:2.5;filter:drop-shadow(0 0 4px #3bdc8a);transition:r .12s}
 .dependency-overlay .dependency-grip:hover{r:9;stroke:#ffffff;fill:#255940}
@@ -334,7 +337,80 @@ function finishLink(e){
 window.addEventListener('resize',()=>requestAnimationFrame(()=>{if(zoomMode==='fit')fitTimeline();else render()}));
 $('chart').closest('.chartwrap')?.addEventListener('scroll',()=>{if(linkState.active)drawDependencies()},{passive:true});
 
+const scroller=$('scroller');
+const renderWithCompletion=render;
+render=function(){
+  renderWithCompletion();
+  for(const t of tasks){
+    const bar=Array.from($('chart').querySelectorAll('.gbar')).find(b=>b.dataset.id===t.id);
+    if(!bar)continue;
+    if(dates(t).progress>=100){
+      bar.classList.add('completed');
+      const check=document.createElement('span');
+      check.className='complete-check';
+      check.setAttribute('aria-label','100% complete');
+      check.textContent='✓';
+      bar.appendChild(check);
+    }
+  }
+};
+
+function focusTimelineStart(id){
+  const t=find(id);if(!t)return;
+  const d=dates(t);
+  const scaleSettings={days:[63,34],weeks:[168,12],months:[540,4],years:[1826,1.6]};
+  if(zoomMode==='fit'){zoomMode='days';$('zoom').value='days';[viewDays,DAYWIDTH]=scaleSettings.days}
+  else viewDays=scaleSettings[zoomMode][0];
+  viewStart=add(d.start,-Math.floor(viewDays/2));
+  render();
+  const targetOffset=Math.floor(viewDays/2)*DAYWIDTH;
+  const timelineViewport=Math.max(0,scroller.clientWidth-nameColumnWidth());
+  scroller.scrollLeft=Math.max(0,targetOffset-timelineViewport/2);
+}
+
+$('chart').addEventListener('dblclick',e=>{
+  const row=e.target.closest('.taskname');
+  if(!row)return;
+  const id=row.closest('.chartrow')?.dataset.rowId;
+  if(!id)return;
+  e.preventDefault();e.stopImmediatePropagation();
+  focusTimelineStart(id);
+},true);
+
+let extendingTimeline=false;
+function extendTimeline(direction){
+  if(extendingTimeline||zoomMode==='fit')return;
+  extendingTimeline=true;
+  const chunk=Math.max(28,Math.ceil(scroller.clientWidth/DAYWIDTH));
+  if(direction<0)viewStart=add(viewStart,-chunk);
+  viewDays+=chunk;
+  render();
+  if(direction<0)scroller.scrollLeft+=chunk*DAYWIDTH;
+  extendingTimeline=false;
+}
+scroller.addEventListener('scroll',()=>{
+  if(zoomMode==='fit'||extendingTimeline)return;
+  const threshold=Math.max(DAYWIDTH*7,scroller.clientWidth*.15);
+  if(scroller.scrollLeft<=threshold)extendTimeline(-1);
+  else if(scroller.scrollLeft+scroller.clientWidth>=scroller.scrollWidth-threshold)extendTimeline(1);
+},{passive:true});
+
+const setScaleAtViewportCenter=setScale;
+setScale=function(mode,keepCenter=false){
+  if(mode==='fit'||!keepCenter){setScaleAtViewportCenter(mode,keepCenter);return}
+  const center=add(viewStart,Math.round((scroller.scrollLeft+Math.max(0,scroller.clientWidth-nameColumnWidth())/2)/DAYWIDTH));
+  viewStart=add(center,-Math.round(viewDays/2));
+  setScaleAtViewportCenter(mode,true);
+  scroller.scrollLeft=Math.max(0,Math.round(viewDays/2)*DAYWIDTH-Math.max(0,scroller.clientWidth-nameColumnWidth())/2);
+};
+
+const initialBuffer=Math.max(28,Math.ceil(scroller.clientWidth/DAYWIDTH));
+viewStart=add(viewStart,-initialBuffer);
+viewDays+=initialBuffer;
 render();
+scroller.scrollLeft=initialBuffer*DAYWIDTH;
+const tipText=document.querySelector('.footer span');
+if(tipText)tipText.innerHTML='<b>Tip:</b> Double-click a task or workstream name to center its start date. Use task details to rename; click a bar to edit its details.';
 })();
 </script>
 </body></html>
