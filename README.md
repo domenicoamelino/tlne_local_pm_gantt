@@ -18,15 +18,18 @@ Then visit http://localhost:8000.
 
 - Expandable workstreams and reorderable subtasks
 - Editable task names, descriptions, dates, durations, completion, and colors
+- Project milestones with editable dates, titles, descriptions, line styles, and title placement
 - Draggable and resizable Gantt bars
 - Graphical task dependencies with movable connector routing
 - Zoom from days to years and fit-to-project view
-- JSON import/export, including project name, task order, and dependencies
+- JSON import/export, including project name, task order, dependencies, and milestones
 - Browser-local autosave
 
 ## Data
 
 The application stores the current project in your browser's local storage. **Browser local storage is not synchronized across devices or repositories.** Use **Export JSON** to back up project data and **Import JSON** to restore it.
+
+Milestones are included in browser-local autosave and JSON exports. Older project JSON files without milestones continue to import normally.
 
 This repository contains the application only, not your browser's saved project data.
 
